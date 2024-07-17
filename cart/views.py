@@ -5,9 +5,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from cart.models import CartModel
-from cart.serializers import CartAddSerializer
+from cart.serializers import CartAddSerializer, CartListSerializer
 from products.models import ProductModel
 from shared.custom_pagination import CustomPagination
+from shared.permission import IsOwner
 
 
 class CartAddAPIView(generics.CreateAPIView):
@@ -15,14 +16,6 @@ class CartAddAPIView(generics.CreateAPIView):
     serializer_class = CartAddSerializer
     permission_classes = [IsAdminUser]
 
-    # def perform_create(self, serializer):
-    #     serializer.save(user=self.request.user)
-
-    # def perform_create(self, serializer):
-    #     if serializer.is_valid():
-    #         print(serializer.validated_data)
-    #     get_id = self.kwargs.get('pk')
-    #     serializer.save(user_id=get_id)
     def perform_create(self, serializer):
         user = self.request.user
         serializer.save(user_id=user)
@@ -34,17 +27,41 @@ class CartAddAPIView(generics.CreateAPIView):
 
 
 class CartListAPIView(generics.ListAPIView):
-    serializer_class = CartAddSerializer
+    serializer_class = CartListSerializer
     permission_classes = [IsAdminUser]
 
-    # def get_queryset(self):
-    #     user = self.request.user
-    #     return CartModel.objects.filter(user=user)
-
     def get_queryset(self):
-        carts = CartModel.objects.all()  # Barcha savat elementlarini olish
-        product_ids = [cart.product_id for cart in carts]  # Savat elementlarining product_id larini olish
-        pr_id = CartModel.objects.g
+        return CartModel.objects.all()
 
-        products = ProductModel.objects.filter(id=product_ids)
-        return products
+
+class CartPlusAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsOwner]
+    serializer_class = CartAddSerializer
+
+    def put(self, request, pk):
+        print(pk)
+        post = CartModel.objects.filter(product_id_id=pk).first( )
+        print(post)
+        if not post.exists():
+            response = {
+                "status": True,
+                "message": "does not found",
+            }
+            return Response(response, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = CartModel.objects.filter(product_id=pk)
+        if serializer.is_valid():
+            self.check_object_permissions(post, request)
+            serializer.save(post.quantity + 1)
+            response = {
+                "status": True,
+                "message": "Successfully updated"
+            }
+            return Response(response, status=status.HTTP_202_ACCEPTED)
+        else:
+            response = {
+                "status": False,
+                "message": "Invalid request",
+                "error": serializer.errors
+            }
+            return Response(response, status=status.HTTP_400_BAD_REQUEST)

@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.permissions import IsAdminUser
 
 from cart.models import CartModel
 from products.models import ProductModel
@@ -6,6 +7,7 @@ from products.serializers import ProductSerializer
 
 
 class CartAddSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True, source='product_id')
 
     class Meta:
         model = CartModel
@@ -14,14 +16,14 @@ class CartAddSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         return super().create(validated_data)
 
-    # def get_me_liked(self, obj):
-    #     request = self.context.get('request', None)
-    #     return CartModel.objects.filter(post=obj.product_id, user=request.user).exists()
-
 
 class CartListSerializer(serializers.ModelSerializer):
-    product = CartAddSerializer(read_only=True)
+    product = ProductSerializer(read_only=True, source='product_id')
 
     class Meta:
         model = CartModel
-        fields = ['id', 'name', 'price', 'photo', 'description', 'quantity']
+        fields = ['product', 'quantity']
+
+    def validate(self, data):
+        story_id = self.request.data['product_id']
+        ProductModel.objects.filter(user=self.request.user, id=story_id)

@@ -9,9 +9,6 @@ class CartModel(models.Model):
     user_id = models.ForeignKey(UserModel, on_delete=models.CASCADE, related_name='users')
     quantity = models.IntegerField()
 
-    def __str__(self):
-        return self.quantity
-
     class Meta:
         verbose_name = 'Cart'
         verbose_name_plural = 'Carts'
