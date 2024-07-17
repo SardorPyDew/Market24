@@ -6,6 +6,7 @@ from rest_framework import generics, status
 from products.models import ProductModel
 from products.serializers import ProductSerializer
 from shared.custom_pagination import CustomPagination
+from shared.permission import IsOwner
 from users.models import UserModel
 
 
@@ -15,9 +16,8 @@ class ProductCreateAPIView(generics.CreateAPIView):
     permission_classes = [IsAdminUser]
     pagination_class = CustomPagination
 
-    # def post(self, request, *args, **kwargs):
-    #    user_id = ProductModel.objects.all()
-    #    user_id = UserModel.objects.filter(id=user_id.user_)
+    # def perform_create(self, serializer):
+    #     serializer.save(user_id=self.request.user)
 
 
 class ProductsUpdateView(generics.UpdateAPIView):
@@ -48,6 +48,7 @@ class ProductsUpdateView(generics.UpdateAPIView):
         }
         return Response(response, status=status.HTTP_200_OK)
 
+
 class UserProductListView(generics.ListAPIView):
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated]
@@ -67,5 +68,24 @@ class ProductsDetailView(generics.ListAPIView):
         return ProductModel.objects.filter(id=product_id)
 
 
+class ProductDeleteView(APIView):
+    # permission_classes = [IsAuthenticated, IsOwner]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        product = ProductModel.objects.filter(id=pk)
+        if not product.first():
+            response = {
+                "status": False,
+                "message": "Product does not exists",
+            }
+            return Response(response, status=status.HTTP_404_NOT_FOUND)
+        self.check_object_permissions(product.first(), request)
+        product.delete()
+        response = {
+            "status": True,
+            "message": "Successfully deleted"
+        }
+        return Response(response, status=status.HTTP_204_NO_CONTENT)
 
 

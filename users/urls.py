@@ -15,7 +15,7 @@ urlpatterns = [
     path('refresh/token/', RefreshTokenView.as_view(), name='refresh-token'),
 
     # Users all Admin
-    path('list/', LoginListAPIView.as_view(), name='login-list'),
+    path('', LoginListAPIView.as_view(), name='login-list'),
     path('<int:pk>/', UserDetailAPIView.as_view(), name='user-detail')
 ]
 
