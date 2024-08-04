@@ -4,8 +4,9 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from cart.models import CartModel
-from cart.serializers import CartAddSerializer, CartListSerializer
+from cart.models import CartModel, Cart, CartItem
+from cart.serializers import CartAddSerializer, CartListSerializer, CheckoutSerializer
+from order.models import OrderModel, OrderItem
 from products.models import ProductModel
 from shared.custom_pagination import CustomPagination
 from shared.permission import IsOwner
@@ -39,7 +40,8 @@ class CartPlusAPIView(APIView):
 
     def put(self, request, pk):
         try:
-            post = CartModel.objects.get(product_id=pk, user_id=request.user)
+            # product_id ga ko'ra birinchi cart elementni topish
+            post = CartModel.objects.get(product_id=pk, user=request.user)
         except CartModel.DoesNotExist:
             response = {
                 "status": False,
@@ -47,20 +49,54 @@ class CartPlusAPIView(APIView):
             }
             return Response(response, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = CartAddSerializer(post, data=request.data, partial=True)
+        # Miqdorni oshirish
+        post.quantity += 1
+        post.save()
 
+        serializer = CartAddSerializer(post)
+        response = {
+            "status": True,
+            "message": "Successfully updated",
+            "data": serializer.data
+        }
+        return Response(response, status=status.HTTP_202_ACCEPTED)
+
+
+class CheckoutAPIView(generics.CreateAPIView):
+    queryset = OrderModel.objects.all()
+    serializer_class = CheckoutSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        serializer = CheckoutSerializer(data=request.data)
         if serializer.is_valid():
-            post.quantity += 1
-            post.save()
-            response = {
-                "status": True,
-                "message": "Successfully updated"
-            }
-            return Response(response, status=status.HTTP_202_ACCEPTED)
-        else:
-            response = {
-                "status": False,
-                "message": "Invalid request",
-                "error": serializer.errors
-            }
-            return Response(response, status=status.HTTP_400_BAD_REQUEST)
+            cart_id = serializer.validated_data.get('cart_id')
+            phone_number = serializer.validated_data.get('phone_number')
+            address = serializer.validated_data.get('address')
+
+            try:
+                cart = Cart.objects.get(id=cart_id)
+            except Cart.DoesNotExist:
+                return Response({"detail": f"Cart with id {cart_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
+
+            order = OrderModel.objects.create(
+                user=request.user,
+                phone_number=phone_number,
+                address=address,
+                cart=cart
+            )
+
+            cart_items = CartItem.objects.filter(cart=cart)
+            for cart_item in cart_items:
+                OrderItem.objects.create(
+                    order=order,
+                    product=cart_item.product,
+                    quantity=cart_item.quantity
+                )
+
+            cart_items.delete()
+
+            return Response({"status": True, "detail": "Order created successfully!..."},
+                            status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
